@@ -27,12 +27,159 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 
 #define __in
+#define __out
+#define __out_opt
 
-#define SERIAL_PORT "/dev/ttyUSB0" // port name
-#define SLEEP_INTERVAL 20000 // us
+#define BYTES_PER_KBYTE (1024.0)
+#define SERIAL_BAUD ((speed_t) B9600) // speed
+#define SERIAL_FLAGS (O_WRONLY | O_NOCTTY) // write-only terminal
+#define SERIAL_PORT "/dev/ttyUSB0" // name
+#define SLEEP_INTERVAL (100000) // us
+
+void 
+close_file(
+	__in FILE *file
+	)
+{
+	if(file) {
+		fprintf(stdout, "[UNINIT] File closed on 0x%p\n", file);
+		fclose(file);
+	}
+}
+
+void 
+close_serial(
+	__in int port
+	)
+{
+	if(port) {
+		fprintf(stdout, "[UNINIT] Serial closed on port %d\n", port);
+		close(port);
+	}
+}
+
+int 
+open_file(
+	__in const char *path,
+	__out FILE **file
+	)
+{
+	int result = 0;
+
+	if(!path || !file) {
+		fprintf(stderr, "[ERROR] Invalid open file parameter\n");
+		result = 1;
+		goto exit;
+	}
+
+	*file = fopen(path, "r");
+	if(!*file) {
+		fprintf(stderr, "[ERROR] Failed to open input file: %s: %s\n", 
+				path, strerror(errno));
+		result = errno;
+		goto exit;
+	}
+
+	fprintf(stdout, "[INIT] %s opened on 0x%p\n", path, *file);
+
+exit:
+	return result;
+}
+
+int 
+open_serial(
+	__in const char *name,
+	__in speed_t baud,
+	__in int flags,
+	__out int *port
+	)
+{
+	int result = 0;
+	struct termios tty;
+
+	if(!name || !port) {
+		fprintf(stderr, "[ERROR] Invalid open serial parameter\n");
+		result = 1;
+		goto exit;
+	}
+
+	*port = open(name, flags);
+	if(*port < 0) {
+		fprintf(stderr, "[ERROR] Failed to open serial port: %s: %s\n",
+				name, strerror(errno));
+		result = errno;
+		goto exit;
+	}
+
+	memset(&tty, 0, sizeof(struct termios));
+
+	if(tcgetattr(*port, &tty)) {
+		fprintf(stderr, "[ERROR] Failed to retrieve serial port attributes: %s: %s\n",
+				name, strerror(errno));
+		result = errno;
+		goto exit;
+	}
+
+	cfsetospeed(&tty, baud);
+	tty.c_oflag |= (OLCUC | ONLCR); // map all lower case to upper case, map NL to CR-NL
+	tty.c_cflag &= ~(CSIZE | CSTOPB | CRTSCTS | PARENB); // single stop bit, no flow control, no parity bit
+	tty.c_cflag |= CS8; // 8-bit character size
+	tcflush(*port, TCOFLUSH);
+
+	if(tcsetattr(*port, TCSANOW, &tty)) {
+		fprintf(stderr, "[ERROR] Failed to set serial port attributes: %s: %s\n",
+				name, strerror(errno));
+		result = errno;
+		goto exit;
+	}
+
+	fprintf(stdout, "[INIT] %s opened on port %d\n", name, *port);
+
+exit:
+	return result;
+}
+
+int 
+write_serial(
+	__in FILE *file,
+	__in int port,
+	__in useconds_t delay,
+	__out_opt size_t *written
+	)
+{
+	int result = 0;
+	char str[2] = {0};
+	size_t bytes_written = 0;
+
+	if(!file || !port) {
+		fprintf(stderr, "[ERROR] Invalid write parameter: File: 0x%p, Port: %d\n",
+				file, port);
+		result = errno;
+		goto exit;
+	}
+
+	fprintf(stdout, "[INFO] Writting to serial... ");
+
+	while((str[0] = fgetc(file)) != EOF) {
+		write(port, str, 1);
+		++bytes_written;
+		usleep(delay);
+	}
+
+	fprintf(stdout, "Done.\n[INFO] %.02f KB (%lu bytes) written to serial\n", 
+			(bytes_written / BYTES_PER_KBYTE), bytes_written);
+
+	if(written) {
+		*written = bytes_written;
+	}
+
+exit:
+	return result;
+}
 
 int 
 main(
@@ -40,7 +187,7 @@ main(
 	__in const char **argv
 	)
 {
-	char str[2] = {0};
+	
 	FILE *input = NULL;
 	int result = 0, serial = 0;
 
@@ -50,38 +197,27 @@ main(
 		goto exit;
 	}
 
-	serial = open(SERIAL_PORT, O_WRONLY | O_NOCTTY | O_SYNC);
-	if(serial < 0) {
-		fprintf(stderr, "Failed to open serial port: %s: %s\n",
-				SERIAL_PORT, strerror(errno));
-		result = errno;
+	result = open_serial(SERIAL_PORT, SERIAL_BAUD, SERIAL_FLAGS, &serial);
+	if(result) {
 		goto exit;
 	}
 
-	input = fopen(argv[1], "r");
-	if(!input) {
-		fprintf(stderr, "Failed to open input file: %s: %s\n", 
-				argv[1], strerror(errno));
-		result = errno;
+	result = open_file(argv[1], &input);
+	if(result) {
 		goto exit;
 	}
 
-	while((str[0] = fgetc(input)) != EOF) {
-		write(serial, str, 1);
-		usleep(SLEEP_INTERVAL);
+	result = write_serial(input, serial, SLEEP_INTERVAL, NULL);
+	if(result) {
+		goto exit;
 	}
 
 exit:
 
-	if(input) {
-		fclose(input);
-		input = NULL;
-	}
-
-	if(serial) {
-		close(serial);
-		serial = 0;
-	}
+	close_file(input);
+	input = NULL;
+	close_serial(serial);
+	serial = 0;
 
 	return result;
 }
