@@ -38,7 +38,7 @@
 #define SERIAL_BAUD ((speed_t) B9600) // speed
 #define SERIAL_FLAGS (O_WRONLY | O_NOCTTY) // write-only terminal
 #define SERIAL_PORT "/dev/ttyUSB0" // name
-#define SLEEP_INTERVAL (100000) // us
+#define SLEEP_INTERVAL (40000) // us
 
 void 
 close_file(
@@ -212,8 +212,9 @@ main(
 		goto exit;
 	}
 
-exit:
+	getchar();
 
+exit:
 	close_file(input);
 	input = NULL;
 	close_serial(serial);
