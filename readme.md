@@ -36,7 +36,7 @@ serial-writer [PATH]
 
 ####Arguments
 ```
-PATH                Path to basic (.bas) file
+PATH             -- Path to basic (.bas) file
 ```
 
 Changelog
