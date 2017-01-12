@@ -1,6 +1,6 @@
 /**
  * Superboard III Serial Writer
- * Copyright (C) 2015 David Jolly
+ * Copyright (C) 2015-2017 David Jolly
  * ----------------------
  *
  * This tool is free software: you can redistribute it and/or modify
@@ -35,10 +35,10 @@
 #define __out_opt
 
 #define BYTES_PER_KBYTE (1024.0)
-#define SERIAL_BAUD ((speed_t) B9600) // speed
+#define SERIAL_BAUD ((speed_t) B115200) // speed
 #define SERIAL_FLAGS (O_WRONLY | O_NOCTTY) // write-only terminal
 #define SERIAL_PORT "/dev/ttyUSB0" // name
-#define SLEEP_INTERVAL (40000) // us
+#define SLEEP_INTERVAL (2000) // us
 
 void 
 close_file(
@@ -170,6 +170,8 @@ write_serial(
 		usleep(delay);
 	}
 
+	write(port, "run\r\n", 5);
+
 	fprintf(stdout, "Done.\n[INFO] %.02f KB (%lu bytes) written to serial\n", 
 			(bytes_written / BYTES_PER_KBYTE), bytes_written);
 
@@ -211,8 +213,6 @@ main(
 	if(result) {
 		goto exit;
 	}
-
-	getchar();
 
 exit:
 	close_file(input);
