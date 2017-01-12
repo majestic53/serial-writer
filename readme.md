@@ -6,10 +6,10 @@ A tool to slow serial traffic between the host machine and Superboard III, allow
 Table of Contents
 =================
 
-1. [Build](https://github.com/majestic53/serial-writer##build)
-2. [Usage](https://github.com/majestic53/serial-writer##usage)
-3. [Changelog](https://github.com/majestic53/serial-writer##changelog)
-4. [License](https://github.com/majestic53/serial-writer##license)
+1. [Build](https://github.com/majestic53/serial-writer#build)
+2. [Usage](https://github.com/majestic53/serial-writer#usage)
+3. [Changelog](https://github.com/majestic53/serial-writer#changelog)
+4. [License](https://github.com/majestic53/serial-writer#license)
 
 Build
 =====
